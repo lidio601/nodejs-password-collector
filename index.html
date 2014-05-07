@@ -1,0 +1,68 @@
+<!doctype html>
+<html>
+<head>
+	<title>Password Collector</title>
+	<script type="text/javascript" src="/jquery-1.11.1.min.js"></script>
+	<script>
+		$(window.document).scroll(function(){
+			$(window.document).find('topform').css('background-position','0px -'+$(window.document).scrollTop()+'px');
+			console.log($(window.document).find('topform').css('background-position'));
+		});
+	</script>
+	<link rel="stylesheet" type="text/css" href="/style.css">
+	<style type="text/css">
+	</style>
+	<!--[if gte IE 9]>
+	<style type="text/css">
+	body {
+	   filter: none;
+	}
+	</style>
+	<![endif]-->
+</head>
+<body>
+	<topform>
+		<searchbox>
+			<searchlabel>Search:</searchlabel>
+			<input type="text" name="searchterm" value="">
+			<button name="searchbutton"></button>
+		</searchbox>
+		<insertbox>
+			<searchlabel>Description:</searchlabel>
+			<input type="text" name="newdescription" value="">
+			<searchlabel>Username:</searchlabel>
+			<input type="text" name="newusername" value="">
+			<searchlabel>Password:</searchlabel>
+			<input type="text" name="newpassword" value="">
+			<button name="addbutton"></button>
+		</insertbox>
+		<hr>
+	</topform>
+	<bottomform>
+		<passwordtable>
+			<header>
+				<passwordcolumn>Label</passwordcolumn>
+				<passwordcolumn>Username</passwordcolumn>
+				<passwordcolumn>Password</passwordcolumn>
+			</header>
+			<rows>
+				<row>
+					<passwordcolumn>a</passwordcolumn>
+					<passwordcolumn>b</passwordcolumn>
+					<passwordcolumn>c</passwordcolumn>
+				</row>
+				<row>
+					<passwordcolumn>d</passwordcolumn>
+					<passwordcolumn>e</passwordcolumn>
+					<passwordcolumn>f</passwordcolumn>
+				</row>
+				<row>
+					<passwordcolumn>g</passwordcolumn>
+					<passwordcolumn>h</passwordcolumn>
+					<passwordcolumn>i</passwordcolumn>
+				</row>
+			</rows>
+		</passwordtable>
+	</bottomform>
+</body>
+</html>
