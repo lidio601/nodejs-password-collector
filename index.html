@@ -2,14 +2,48 @@
 <html>
 <head>
 	<title>Password Collector</title>
-	<script type="text/javascript" src="/jquery-1.11.1.min.js"></script>
+	<script type="text/javascript" src="jquery-1.11.1.min.js"></script>
 	<script>
-		$(window.document).scroll(function(){
-			$(window.document).find('topform').css('background-position','0px -'+$(window.document).scrollTop()+'px');
-			console.log($(window.document).find('topform').css('background-position'));
+
+/*
+$(window.document).scroll(function(){
+	$(window.document).find('topform').css('background-position','0px -'+$(window.document).scrollTop()+'px');
+});
+*/
+
+$(window.document).keypress(function(event){
+	// http://stackoverflow.com/questions/967096/using-jquery-to-test-if-an-input-has-focus
+	if(!$("input:focus").length) {
+		if(event.charCode=='f'.charCodeAt(0)) {
+			$(window.document).find('[name=searchterm]').focus();
+			return false;
+		}
+		if(event.charCode=='a'.charCodeAt(0)) {
+			$(window.document).find('[name=newdescription]').focus();
+			return false;
+		}
+	}
+});
+
+function setupTable() {
+	var callBackFunction = function(){
+		//console.log($(this));
+		$.post('%backend%/password/get',{
+			id: $(this).attr('id')
+		},function(response){
+			console.log(response);
 		});
+	};
+	$('passwordcolumn[password="yes"]').unbind('click');
+	$('passwordcolumn[password="yes"]').click(callBackFunction);
+}
+
+$(window.document).ready(function(){
+	setupTable();
+});
+
 	</script>
-	<link rel="stylesheet" type="text/css" href="/style.css">
+	<link rel="stylesheet" type="text/css" href="style.css">
 	<style type="text/css">
 	</style>
 	<!--[if gte IE 9]>
@@ -36,7 +70,6 @@
 			<input type="text" name="newpassword" value="">
 			<button name="addbutton"></button>
 		</insertbox>
-		<hr>
 	</topform>
 	<bottomform>
 		<passwordtable>
@@ -49,17 +82,17 @@
 				<row>
 					<passwordcolumn>a</passwordcolumn>
 					<passwordcolumn>b</passwordcolumn>
-					<passwordcolumn>c</passwordcolumn>
+					<passwordcolumn password="yes" id="1">&#10038;</passwordcolumn>
 				</row>
 				<row>
 					<passwordcolumn>d</passwordcolumn>
 					<passwordcolumn>e</passwordcolumn>
-					<passwordcolumn>f</passwordcolumn>
+					<passwordcolumn password="yes" id="2">&#10038;</passwordcolumn>
 				</row>
 				<row>
 					<passwordcolumn>g</passwordcolumn>
 					<passwordcolumn>h</passwordcolumn>
-					<passwordcolumn>i</passwordcolumn>
+					<passwordcolumn password="yes" id="3">&#10038;</passwordcolumn>
 				</row>
 			</rows>
 		</passwordtable>

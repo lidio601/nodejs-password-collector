@@ -1,14 +1,24 @@
 
 var PORT = 9797;
+var JSPORT = 9798;
+
+var http = require('http');
+
+var fs = require('fs');
+
+// http://nodejs.org/api/path.html
+var path = require('path');
 
 // http://stackoverflow.com/questions/10645994/node-js-how-to-format-a-date-string-in-utc
 // npm install dateformat
-
-var http = require('http');
-var fs = require('fs');
-// http://nodejs.org/api/path.html
-var path = require('path');
 var dateformat = require('dateformat');
+
+// https://gist.github.com/diorahman/1520485
+var express = require('express');
+
+// https://www.npmjs.org/package/rand-token
+// Create a token generator with the default settings:
+var randtoken = require('rand-token');
 
 // http://stackoverflow.com/questions/6388842/nodejs-http-server-how-to-verify-clients-ip-and-login
 // https://github.com/gevorg/http-auth
@@ -29,6 +39,30 @@ var allowedIps = ['127.0.0.1','::1'];
 
 var plainFiles = ['favicon.ico','sansation_light.woff','style.css','add1.png','search1.png','jquery-1.11.1.min.js'];
 
+// Generate mostly sequential tokens:
+var suid = randtoken.suid;
+//var token = suid(16);
+
+var tt = require('./TokensProvider').TokensProvider;
+var TokensProvider = new tt();
+
+// http://www.phpied.com/sleep-in-javascript/
+function sleep(milliseconds) {
+  var start = new Date().getTime();
+  for (var i = 0; i < 1e7; i++) {
+    if ((new Date().getTime() - start) > milliseconds){
+      break;
+    }
+  }
+}
+
+sleep(3000);
+console.log("tokens: "+JSON.stringify(TokensProvider.findAll()));
+
+var variables = {
+	backend: 'http://localhost:'+JSPORT+'/endpoint/%token%'
+};
+
 // http://stackoverflow.com/questions/6388842/nodejs-http-server-how-to-verify-clients-ip-and-login
 var http = require('http');
 var server = http.createServer(basic, function (req, res) {
@@ -42,7 +76,7 @@ var server = http.createServer(basic, function (req, res) {
 	}
 	
 	//res.write("Welcome to private area - " + req.user + "! ip: "+req.connection.remoteAddress);
-	console.log("client "+res.socket.remoteAddress+" has requested "+req.url);
+	console.log("port "+res.socket.localPort+" client "+res.socket.remoteAddress+" has requested "+req.url+"");
 	// Client address in request -----^
 	
 	if(plainFiles.indexOf(path.basename(req.url))>-1) {
@@ -59,6 +93,10 @@ var server = http.createServer(basic, function (req, res) {
 					header['Content-Type'] = 'image/x-icon';
 				} else if(path.extname(req.url)=='.woff') {
 					header['Content-Type'] = 'application/x-font-woff';
+				} else if(path.extname(req.url)=='.css') {
+					header['Content-Type'] = 'text/css';
+				} else if(path.extname(req.url)=='.js') {
+					header['Content-Type'] = 'application/javascript';
 				}
 				
 				fs.stat( './'+path.basename(req.url), function(err, stats) {
@@ -79,7 +117,7 @@ var server = http.createServer(basic, function (req, res) {
 					}
 					
 					// http://stackoverflow.com/questions/8164802/serialize-javascript-object-into-a-json-string
-					console.log('answered 200 '+JSON.stringify(header));
+					//console.log('answered 200 '+JSON.stringify(header));
 					res.writeHead(200, header);
 					res.end(content);
 					
@@ -113,11 +151,42 @@ var server = http.createServer(basic, function (req, res) {
 					header['Last-Modified'] = day;
 				}
 				
-				console.log('answered 200 '+JSON.stringify(header));
+				//console.log('answered 200 '+JSON.stringify(header));
 				res.writeHead(200, header);
-				res.write(html);
-				res.end();
 				
+				// http://nodejs.org/api/buffer.html#buffer_buf_tostring_encoding_start_end
+				html = html.toString();
+				//console.log(html);
+				
+				for(var x in variables) {
+					//console.log(x+' '+variables[x]);
+					// http://stackoverflow.com/questions/13467981/string-replace-not-working-in-node-js-express-server
+					// http://stackoverflow.com/questions/494035/how-do-you-pass-a-variable-to-a-regular-expression-javascript
+					html = html.replace( new RegExp("%"+x+"%","gi"), variables[x]);
+				}
+				
+				TokensProvider.findOne({
+					address: req.socket.remoteAddress,
+					port: req.socket.remotePort,
+					token: { $exists: 1 }
+				},function(err,ris) {
+					var token = ris && ris[0] ? ris[0] : false;
+					if( !token ) {
+						token = suid(16);
+						TokensProvider.save({
+							address: req.socket.remoteAddress,
+							port: req.socket.remotePort,
+							token: token
+						},function(err,ris){
+							console.log(err);
+							console.log(ris);
+						});
+					}
+					html = html.replace( new RegExp("%token%","gi"), token);
+				
+					res.write(html);
+					res.end();
+				});
 			});
 			
 	    }
@@ -131,7 +200,7 @@ server.on('connection', function(socket) {
 	sockets.push(socket);
 	socket.setTimeout(4000);
 	socket.once('close', function () {
-		console.log('socket closed');
+		//console.log('socket closed');
 		sockets.splice(sockets.indexOf(socket), 1);
 	});
 });
@@ -149,3 +218,86 @@ server.on('close',function() {
 });
 
 server.listen(PORT);
+console.log("listening on port "+PORT);
+
+// https://gist.github.com/diorahman/1520485
+var app = express();
+
+// https://github.com/gevorg/http-auth
+//app.use(auth.connect(basic));
+
+app.get('*',function(req,res){
+	//console.log('query: ' + JSON.stringify(req.query));
+	//console.log((req.headers.host+"").replace(JSPORT,PORT));
+	res.header('Access-Control-Allow-Origin','*');
+	res.header('Location',"http://"+(req.headers.host+"").replace(JSPORT,PORT)+"/");
+	res.writeHead(301, 'Moved Permanently');
+	//console.log(req.headers.host);
+	res.end();
+});
+
+app.post('/endpoint(|/*)', function(req, res) {
+	
+	//console.log(res.socket.remoteAddress);
+	if( allowedIps.indexOf(res.socket.remoteAddress) == -1 ) {
+		res.writeHead(403, {'Content-Type': 'text/plain'});
+		res.end('Access denied');
+		return;
+	}
+	
+	if( req.params && req.params["1"] && req.params["1"].indexOf('/')>=0 ) {
+		req.params = req.params["1"].split("/");
+	}
+	
+	console.log("port "+res.socket.localPort+" client "+res.socket.remoteAddress+":"+res.socket.remotePort+" has requested "+JSON.stringify(req.params)+" "+JSON.stringify(req.query)+" "+JSON.stringify(req.body));
+	
+	var token = TokensProvider.findOne({
+		address: req.socket.remoteAddress,
+		port: req.socket.remotePort,
+		token: { $exists: 1 }
+	}).token;
+	
+	console.log('params: ' + JSON.stringify(req.params));
+	console.log('body: ' + JSON.stringify(req.body));
+	console.log('query: ' + JSON.stringify(req.query));
+	console.log('client token: '+ token);
+	console.log('client tokens: '+ tokens);
+	
+	if( token && req.params && req.params[0] && req.params[0] == token ) {
+		
+		res.header('Access-Control-Allow-Origin','*'); //"http://"+(req.headers.host+"").replace(JSPORT,PORT));
+		res.header('Content-type','application/json');
+		res.header('Charset','utf8');
+		res.writeHead(200);
+		
+		/*
+		res.header('Access-Control-Allow-Credentials', 'true');
+		res.header('Access-Control-Allow-Methods', '*');
+		*/
+	
+		var obj = {
+			result: 1,
+		};
+	
+		res.send(obj);
+		res.end();
+		
+	} else {
+		res.writeHead(403, {'Content-Type': 'text/plain'});
+		res.end('Access denied');
+		return;
+	}
+	
+});
+
+app.post('*',function(req,res){
+	res.header('Access-Control-Allow-Origin','*');
+	res.header('Location',"http://"+(req.headers.host+"").replace(JSPORT,PORT)+"/");
+	res.writeHead(301, 'Moved Permanently');
+	res.end();
+});
+ 
+
+app.listen(JSPORT);
+console.log("listening on port "+JSPORT+" for /endpoint");
+
