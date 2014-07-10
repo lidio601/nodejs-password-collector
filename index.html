@@ -27,7 +27,7 @@ $(window.document).keypress(function(event){
 
 function setupTable() {
 	var callBackFunction = function(){
-		//console.log($(this));
+		console.log($(this));
 		$.post('%backend%/password/get',{
 			id: $(this).attr('id')
 		},function(response){

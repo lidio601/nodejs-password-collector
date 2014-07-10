@@ -5,42 +5,82 @@
 /*
 use admin
 db.auth( '...' , '...' );
-// http://docs.mongodb.org/v2.4/tutorial/add-user-to-database/
-db.addUser( { user: "PasswordCollectorUser",
-              pwd: "Password1234",
-              role: [ { role: "userAdmin", db: "PasswordCollector" } ],
-				roles: []
-            } )
+
+use PasswordCollector
+db.addUser("PasswordCollectorUser","Password1234")
+
 */
 
 var DATABASE = "mongodb://localhost:27017/PasswordCollector";
 
-var Db = require('mongodb').Db;
-var Connection = require('mongodb').Connection;
-var Server = require('mongodb').Server;
-var BSON = require('mongodb').BSON;
-var ObjectID = require('mongodb').ObjectID;
+// http://mongodb.github.io/node-mongodb-native/api-generated/db.html
+var mongo = require('mongodb'),
+	Db = require('mongodb').Db,
+    MongoClient = require('mongodb').MongoClient,
+    Server = require('mongodb').Server,
+    ReplSetServers = require('mongodb').ReplSetServers,
+    ObjectID = require('mongodb').ObjectID,
+    Binary = require('mongodb').Binary,
+    GridStore = require('mongodb').GridStore,
+    Grid = require('mongodb').Grid,
+    Code = require('mongodb').Code,
+    BSON = require('mongodb').pure().BSON,
+    assert = require('assert');
 
 TokensProvider = function() {
 	// http://stackoverflow.com/questions/12846238/node-js-mongodb-set-default-safe-variable
-	this.db = new Db("PasswordCollector", new Server("localhost", "27017", {}),{
-		safe: true,
+	//mongo.Db('PasswordCollectorUser:Password1234@localhost/PasswordCollector?auto_reconnnect');
+	var db = this.db = new Db("PasswordCollector", new Server("localhost", "27017", {}),{
+		safe: false,
 		auto_reconnect: true,
 		fsync: true,
-		w: 'majority'
+		w: 'majority',
+		native_parser: false
 	});
-	this.db.open(function(){
-		console.log('db.open '+JSON.stringify(arguments));
-	});
-	// http://stackoverflow.com/questions/4688693/how-do-i-connect-to-mongodb-with-node-js-and-authenticate
-	this.db.authenticate("PasswordCollectorUser", "Password1234", function(err, res) {
-		console.log('db.authenticate '+JSON.stringify(arguments));
+	db.open(function(err,db){
+		console.log('db.open');
+		assert.equal(null, err);
+		
+		/*
+		// Add a user to the database
+		db.addUser('PasswordCollectorUser', 'Password1234', function(err, result) {
+			assert.equal(null, err);
+			
+			// Authenticate
+			db.authenticate('PasswordCollectorUser', 'Password1234', function(err, result) {
+				assert.equal(true, result);
+				
+				// Logout the db
+				db.logout(function(err, result) {
+					assert.equal(true, result);
+					
+					// Remove the user
+					db.removeUser('user3', function(err, result) {
+						assert.equal(true, result);
+						
+						db.close();
+					});
+					
+				});
+				
+			});
+		});
+		*/
+		
+		//console.log(arguments);
+		// http://stackoverflow.com/questions/4688693/how-do-i-connect-to-mongodb-with-node-js-and-authenticate
+		db.authenticate("PasswordCollectorUser", "Password1234", function(err, res) {
+			assert.equal(null, err);
+			
+			console.log('db.authenticate '+JSON.stringify(arguments));
+		});
+		
 	});
 };
 
 TokensProvider.prototype.getCollection = function(callback) {
   this.db.collection('tokens', function(error, tokens_collection) {
-    if( error ) callback(error);
+    if( error ) callback(error, false);
     else callback(null, tokens_collection);
   });
 };
@@ -76,14 +116,37 @@ TokensProvider.prototype.findOne = function(searchTerm, callback) {
 		} else if(!tokens_collection) {
 			callback("undefined collection");
 		} else {
-			var ris = tokens_collection.findOne(searchTerm);
+			//console.log('tokens.findOne('+JSON.stringify(searchTerm)+')');
+			
+			// http://stackoverflow.com/questions/5010288/how-to-make-a-function-wait-until-a-callback-has-been-called-using-node-js
+			var ris = false;
+			var uvrun = require("uvrun");
+			
+			tokens_collection.findOne(searchTerm, {}, function(err,r) {
+				//console.log('callback '+r);
+				ris = r;
+			});
+			
+			while (!ris) {
+				uvrun.runOnce();
+			}
+			
+			//console.log('ris: '+JSON.stringify(ris));
+			
 			if(!ris) {
-				callback(null,[]);
+				//console.log('tokens.findOne result null');
+				if(typeof(callback)=="function")	callback(null,[]);
+				return false;
 			} else {
+				//console.log('tokens.findOne result '+JSON.stringify(ris));
+				if(typeof(callback)=="function")	callback(null,ris);
+				return ris;
+				/*
 				ris.toArray(function(error, results) {
 					if( error ) callback(error);
 					else callback(null, results);
 				});
+				*/
 			}
 		}
 	});
@@ -104,10 +167,11 @@ TokensProvider.prototype.save = function(tokens, callback) {
 				token = tokens[i];
 				token.created_at = new Date();
 			}
-			console.log("save token: "+JSON.stringify(token));
-			tokens_collection.insert(tokens, function() {
-				console.log("insert token callback: "+JSON.stringify(arguments));
-				callback(null, tokens);
+			console.log("save token: "+JSON.stringify(tokens));
+			tokens_collection.insert(tokens, {w:1}, function(err, records) {
+				//console.log(err);
+				console.log("insert token callback: "+JSON.stringify(records));
+				//callback(null, records);
 			});
 		}
 	});

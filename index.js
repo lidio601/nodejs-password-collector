@@ -43,8 +43,8 @@ var plainFiles = ['favicon.ico','sansation_light.woff','style.css','add1.png','s
 var suid = randtoken.suid;
 //var token = suid(16);
 
-var tt = require('./TokensProvider').TokensProvider;
-var TokensProvider = new tt();
+var TokensProvider = require('./TokensProvider').TokensProvider;
+var tokenprovider = new TokensProvider();
 
 // http://www.phpied.com/sleep-in-javascript/
 function sleep(milliseconds) {
@@ -56,8 +56,8 @@ function sleep(milliseconds) {
   }
 }
 
-sleep(3000);
-console.log("tokens: "+JSON.stringify(TokensProvider.findAll()));
+//sleep(3000);
+//console.log("tokens: "+JSON.stringify(tokenprovider.findAll()));
 
 var variables = {
 	backend: 'http://localhost:'+JSPORT+'/endpoint/%token%'
@@ -165,21 +165,22 @@ var server = http.createServer(basic, function (req, res) {
 					html = html.replace( new RegExp("%"+x+"%","gi"), variables[x]);
 				}
 				
-				TokensProvider.findOne({
+				tokenprovider.findOne({
 					address: req.socket.remoteAddress,
-					port: req.socket.remotePort,
+					//port: req.socket.remotePort,
 					token: { $exists: 1 }
 				},function(err,ris) {
 					var token = ris && ris[0] ? ris[0] : false;
 					if( !token ) {
 						token = suid(16);
-						TokensProvider.save({
+						tokenprovider.save({
 							address: req.socket.remoteAddress,
-							port: req.socket.remotePort,
+							//port: req.socket.remotePort,
 							token: token
 						},function(err,ris){
-							console.log(err);
-							console.log(ris);
+							console.log('save callback');
+							//console.log(err);
+							//console.log(ris);
 						});
 					}
 					html = html.replace( new RegExp("%token%","gi"), token);
@@ -251,17 +252,31 @@ app.post('/endpoint(|/*)', function(req, res) {
 	
 	console.log("port "+res.socket.localPort+" client "+res.socket.remoteAddress+":"+res.socket.remotePort+" has requested "+JSON.stringify(req.params)+" "+JSON.stringify(req.query)+" "+JSON.stringify(req.body));
 	
-	var token = TokensProvider.findOne({
+	// http://stackoverflow.com/questions/5010288/how-to-make-a-function-wait-until-a-callback-has-been-called-using-node-js
+	var token = false;
+	var uvrun = require("uvrun");
+	
+	tokenprovider.findOne({
 		address: req.socket.remoteAddress,
-		port: req.socket.remotePort,
-		token: { $exists: 1 }
-	}).token;
+		//port: req.socket.remotePort,
+		//token: { $exists: 1 }
+		token: req.params[0]
+	}, function(err,ris) {
+		//console.log('callback '+JSON.stringify(ris));
+		token = ris;
+	});
+	
+	while (!token) {
+		uvrun.runOnce();
+	}
+	
+	token = token ? token.token : false;
 	
 	console.log('params: ' + JSON.stringify(req.params));
 	console.log('body: ' + JSON.stringify(req.body));
 	console.log('query: ' + JSON.stringify(req.query));
 	console.log('client token: '+ token);
-	console.log('client tokens: '+ tokens);
+	console.log('client tokens: '+ tokenprovider);
 	
 	if( token && req.params && req.params[0] && req.params[0] == token ) {
 		
@@ -278,6 +293,8 @@ app.post('/endpoint(|/*)', function(req, res) {
 		var obj = {
 			result: 1,
 		};
+		console.log('SENDING BACK');
+		console.log(obj);
 	
 		res.send(obj);
 		res.end();
