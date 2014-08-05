@@ -1,7 +1,36 @@
 
+/*
+	How to add a user
+> htpasswd users.htpasswd <USERNAME>
+*/
+
+/*
+	Front-end port
+*/
 var PORT = 9797;
+
+/*
+	Backend-end port
+*/
 var JSPORT = 9798;
 
+/*
+	IP's to accept connection from
+*/
+var allowedIps = ['127.0.0.1','::1','192.168.10.100'];
+
+/*
+	Media files under '/media' directory
+*/
+var plainFiles = ['favicon.ico','sansation_light.woff','style.css','add1.png','search1.png','jquery-1.11.1.min.js'];
+
+/*
+////////////////////////////
+	Import
+////////////////////////////
+*/
+
+// http://stackoverflow.com/questions/6388842/nodejs-http-server-how-to-verify-clients-ip-and-login
 var http = require('http');
 
 var fs = require('fs');
@@ -28,23 +57,20 @@ var randtoken = require('rand-token');
 // htpasswd users.htpasswd <USERNAME>
 var auth = require('http-auth');
 var basic = auth.basic({
-    realm: "Exatel Private Area.",
+    realm: "Private Area.",
     file: __dirname + "/users.htpasswd" // gevorg:gpass, Sarah:testpass ...
 });
+
+// https://www.npmjs.org/package/sqlite3
+var sqlite3 = require('sqlite3').verbose();
+var dbmem = new sqlite3.Database(':memory:');
 
 // http://stackoverflow.com/questions/14626636/how-do-i-shutdown-a-node-js-https-server-immediately/14636625#14636625
 var sockets = [];
 
-var allowedIps = ['127.0.0.1','::1'];
-
-var plainFiles = ['favicon.ico','sansation_light.woff','style.css','add1.png','search1.png','jquery-1.11.1.min.js'];
-
 // Generate mostly sequential tokens:
 var suid = randtoken.suid;
 //var token = suid(16);
-
-var TokensProvider = require('./TokensProvider').TokensProvider;
-var tokenprovider = new TokensProvider();
 
 // http://www.phpied.com/sleep-in-javascript/
 function sleep(milliseconds) {
@@ -56,6 +82,8 @@ function sleep(milliseconds) {
   }
 }
 
+var TokensProvider = require('./TokensProvider').TokensProvider;
+var tokenprovider = new TokensProvider(dbmem);
 //sleep(3000);
 //console.log("tokens: "+JSON.stringify(tokenprovider.findAll()));
 
@@ -63,8 +91,12 @@ var variables = {
 	backend: 'http://localhost:'+JSPORT+'/endpoint/%token%'
 };
 
-// http://stackoverflow.com/questions/6388842/nodejs-http-server-how-to-verify-clients-ip-and-login
-var http = require('http');
+/*
+////////////////////////////
+	HTML Web server
+////////////////////////////
+*/
+
 var server = http.createServer(basic, function (req, res) {
 	
 	//console.log(res.socket.remoteAddress);
@@ -99,7 +131,7 @@ var server = http.createServer(basic, function (req, res) {
 					header['Content-Type'] = 'application/javascript';
 				}
 				
-				fs.stat( './'+path.basename(req.url), function(err, stats) {
+				fs.stat( './media/'+path.basename(req.url), function(err, stats) {
 					
 					// http://www.w3.org/Protocols/rfc2616/rfc2616-sec14.html
 					// http://stackoverflow.com/questions/7559555/last-modified-file-date-in-node-js
@@ -221,6 +253,12 @@ server.on('close',function() {
 server.listen(PORT);
 console.log("listening on port "+PORT);
 
+/*
+////////////////////////////
+	Backend Web server
+////////////////////////////
+*/
+
 // https://gist.github.com/diorahman/1520485
 var app = express();
 
@@ -313,7 +351,6 @@ app.post('*',function(req,res){
 	res.writeHead(301, 'Moved Permanently');
 	res.end();
 });
- 
 
 app.listen(JSPORT);
 console.log("listening on port "+JSPORT+" for /endpoint");
