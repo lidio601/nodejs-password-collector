@@ -1,8 +1,12 @@
 
+/*
+	Old version DB
+	Powered Mongo DB
+
 // http://blog.ijasoneverett.com/2013/03/a-sample-app-with-node-js-express-and-mongodb-part-1/
 // http://mongodb.github.io/node-mongodb-native/api-articles/nodekoarticle1.html
 // https://groups.google.com/forum/#!topic/mongodb-user/j_CEdqu-dXs
-/*
+
 use admin
 db.auth( '...' , '...' );
 
