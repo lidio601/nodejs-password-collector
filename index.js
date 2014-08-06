@@ -200,7 +200,7 @@ var server = http.createServer(basic, function (req, res) {
 				tokenprovider.findOne({
 					address: req.socket.remoteAddress,
 					//port: req.socket.remotePort,
-					token: { $exists: 1 }
+					//token: { $exists: 1 }
 				},function(err,ris) {
 					var token = ris && ris[0] ? ris[0] : false;
 					if( !token ) {
@@ -355,3 +355,4 @@ app.post('*',function(req,res){
 app.listen(JSPORT);
 console.log("listening on port "+JSPORT+" for /endpoint");
 
+dbmem.close();
